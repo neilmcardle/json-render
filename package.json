@@ -39,5 +39,10 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": "prettier --write"
+  },
+  "dependencies": {
+    "ai": "^6.0.37",
+    "react": "^19.2.3",
+    "zod": "^4.3.5"
   }
 }

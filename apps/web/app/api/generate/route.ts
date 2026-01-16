@@ -1,4 +1,6 @@
 import { streamText } from "ai";
+// Load Xai API Key from environment
+const XAI_API_KEY = process.env.XAI_API_KEY;
 
 export const maxDuration = 30;
 
@@ -81,15 +83,51 @@ const MAX_PROMPT_LENGTH = 140;
 
 export async function POST(req: Request) {
   const { prompt } = await req.json();
-
   const sanitizedPrompt = String(prompt || "").slice(0, MAX_PROMPT_LENGTH);
 
-  const result = streamText({
-    model: "anthropic/claude-opus-4.5",
-    system: SYSTEM_PROMPT,
-    prompt: sanitizedPrompt,
+  // Actual Xai API endpoint and payload
+  const XAI_API_URL = "https://api.x.ai/v1/chat/completions";
+  const payload = {
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: sanitizedPrompt },
+    ],
+    model: "grok-4-latest",
+    stream: false,
     temperature: 0.7,
+  };
+
+  const response = await fetch(XAI_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${XAI_API_KEY}`,
+    },
+    body: JSON.stringify(payload),
   });
 
-  return result.toTextStreamResponse();
+  if (!response.ok) {
+    return new Response("Xai API error", { status: 500 });
+  }
+
+  // Assuming the response is streamed JSONL
+  const reader = response.body?.getReader();
+  const stream = new ReadableStream({
+    async pull(controller) {
+      if (!reader) {
+        controller.close();
+        return;
+      }
+      const { done, value } = await reader.read();
+      if (done) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(value);
+    },
+  });
+
+  return new Response(stream, {
+    headers: { "Content-Type": "application/x-ndjson" },
+  });
 }
